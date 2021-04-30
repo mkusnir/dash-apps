@@ -21,7 +21,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output, State
 from flask_caching import Cache
 from uuid import uuid4
-
+import pyodbc
 
 
 external_stylesheets = [
@@ -92,8 +92,26 @@ app.layout = html.Div(className='page',children=[
                 },
                 # Allow multiple files to be uploaded
                 multiple=True
-            ),
-            ]),
+                ),
+                ]),
+                html.Div([
+                    html.Details(id='odbc_control_div', open=False, children=[
+                        html.Summary('Configure ODBC Connection', style={'font-size': '16px'}),
+
+                        html.Label('Database', style={'font-size': '14px', 'border-bottom': '1px solid #000'}),
+                        html.Div(dcc.Input(id='input-on-submit', type='text')),
+
+                        html.Label('Database2', style={'font-size': '14px', 'border-bottom': '1px solid #000'}),
+                        html.Div(dcc.Input(id='input-on-submit-2', type='text')),
+
+                        html.Button('Submit', id='submit-val', n_clicks=0),
+                        html.Div(id='container-button-basic',
+                                 children='Enter a value and press submit')
+
+                    ]),
+                    html.Div(id='1plot-options'),
+                    # html.Hr(),
+                ]),
                 dcc.Loading(id="loading-upload",
                             children=[html.Div(id='data-uploading')],
                             type="default"),
@@ -223,7 +241,7 @@ def from_json(obj):
     ntwk.variables = obj['variables']
     return ntwk
 
-
+# TODO reuse this to put returned SQL string into skrf network object
 ################################################
 
 def load_touchstone(content_string: str, filename: str) -> rf.Network:
@@ -421,6 +439,7 @@ def time_gate_plot(_, fig1, fig2, fgate, tgate):
     [fig1['data'].append(t) for t in ftracelist]
     [fig2['data'].append(t) for t in ttracelist]
     return fig1, fig2
+
 
 
 @app.callback(
@@ -633,7 +652,21 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
             plotted_axes_format_output
         )
 
+# sample connection string
+#DRIVER={PostgreSQL Unicode};DATABASE=postgres;UID=postgres;PWD=15963;SERVER=localhost;PORT=5432;
 
+@app.callback(
+Output('container-button-basic', 'children'),
+    Input('input-on-submit', 'value'),
+    Input('input-on-submit-2', 'value2'),
+    Input('submit-val', 'n_clicks'),
+)
+def update_output(value, value2, n_clicks):
+    return 'The input value was "{}" and "{}" and the button has been clicked {} times'.format(
+        value,
+        value2,
+        n_clicks
+    )
 
 if __name__ == '__main__':
     app.run_server(debug=True)
