@@ -91,19 +91,14 @@ app.layout = html.Div(className='page',children=[
                     'margin': '10px'
                 },
                 # Allow multiple files to be uploaded
-                multiple=True
+                    multiple=True
                 ),
                 ]),
                 html.Div([
                     html.Details(id='odbc_control_div', open=False, children=[
                         html.Summary('Configure ODBC Connection', style={'font-size': '16px'}),
 
-                        html.Label('Database', style={'font-size': '14px', 'border-bottom': '1px solid #000'}),
                         html.Div(dcc.Input(id='input-on-submit', type='text')),
-
-                        html.Label('Database2', style={'font-size': '14px', 'border-bottom': '1px solid #000'}),
-                        html.Div(dcc.Input(id='input-on-submit-2', type='text')),
-
                         html.Button('Submit', id='submit-val', n_clicks=0),
                         html.Div(id='container-button-basic',
                                  children='Enter a value and press submit')
@@ -655,18 +650,43 @@ def update_graph(_, parm, axes_format, plotted_axes_format, selected_ntwk_rows,
 # sample connection string
 #DRIVER={PostgreSQL Unicode};DATABASE=postgres;UID=postgres;PWD=15963;SERVER=localhost;PORT=5432;
 
-@app.callback(
-Output('container-button-basic', 'children'),
-    Input('input-on-submit', 'value'),
-    Input('input-on-submit-2', 'value2'),
-    Input('submit-val', 'n_clicks'),
-)
-def update_output(value, value2, n_clicks):
-    return 'The input value was "{}" and "{}" and the button has been clicked {} times'.format(
-        value,
-        value2,
-        n_clicks
-    )
+@app.callback([Output('uploaded-data-table', 'data'),
+               Output('data-uploading', 'children')],
+              Output('container-button-basic', 'children'),
+              [Input('submit-val', 'n_clicks')],
+              [dash.dependencies.State('input-on-submit', 'value')])
+
+def update_s_output(n_clicks, value):
+    if value is not None:
+        conn = pyodbc.connect(value)
+        crsr = conn.execute("SELECT s2p FROM bla LIMIT 1")
+        row = crsr.fetchone()
+
+        ch = []
+        ports = []
+        d = {}
+        d2 = []
+        content_type = []
+        content_string = []
+        for i, c in enumerate(row):
+            ct, cs = c.split(',')
+            content_type.append(ct)
+            content_string.append(cs)
+        for c, n in zip(content_string, row):
+            decoded = base64.b64decode(c)
+            try:
+                data = load_touchstone(decoded, n)
+            except Exception as e:
+                print(e)
+                return html.Div(['There was an error processing this file.']), None
+            d2.append({'data': data.__str__()})
+            if write_snp:
+                d[n] = data.write_touchstone(return_string=True)
+            else:
+                d[n] = data.__dict__
+
+        # cache.set(uuid, json.dumps(d, cls=TouchstoneEncoder))
+        return d2, ''
 
 if __name__ == '__main__':
     app.run_server(debug=True)
